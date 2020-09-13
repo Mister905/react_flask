@@ -1,0 +1,126 @@
+PRJECT SETUP
+
+yarn create react-app client
+
+cd client
+
+yarn start
+
+cd ..
+
+mkdir api
+
+cd api 
+
+python3 -m venv venv
+
+source venv/bin/activate
+
+pip install flask python-dotenv
+
+touch .flaskenv
+
+flask run
+
+client/package.json
+
+"start-api": "cd ../api && venv/bin/flask run --no-debugger",
+
+"proxy": "http://localhost:5000"
+
+client/.gitignore
+
+venv
+__pycache__
+
+cd client 
+
+yarn start-api
+
+yarn start
+
+yarn build
+
+
+
+SERVER SETUP
+
+https://www.digitalocean.com/community/tutorials/initial-server-setup-with-ubuntu-18-04
+
+ssh root@138.197.164.16
+
+adduser jamesm
+
+usermod -aG sudo jamesm
+
+ufw allow OpenSSH
+
+ufw enable
+
+ufw status # You can see that SSH connections are still allowed
+
+As the firewall is currently blocking all connections except for SSH, if you install and configure additional services, you will need to adjust the firewall settings to allow acceptable traffic in. You can learn some common UFW operations in this guide.
+
+Since your public key is already in the root account’s ~/.ssh/authorized_keys file on the server, we can copy that file and directory structure to our new user account in our existing session.
+
+rsync --archive --chown=jamesm:jamesm ~/.ssh /home/jamesm
+
+Now, open up a new terminal session and using SSH with your new username:
+
+ssh jamesm@138.197.164.16
+
+
+
+INSTALL DEPENDENCIES
+
+sudo apt update
+
+sudo apt install nodejs
+
+sudo apt install yarn
+
+sudo apt install software-properties-common
+
+sudo add-apt-repository ppa:deadsnakes/ppa
+
+sudo apt install python3.7
+
+python3.7 --version
+
+sudo apt install python3-pip
+
+sudo apt install git
+
+
+
+https://www.digitalocean.com/community/tutorials/how-to-install-nginx-on-ubuntu-18-04
+
+sudo apt install nginx
+
+Before testing Nginx, the firewall software needs to be adjusted to allow access to the service. Nginx registers itself as a service with ufw upon installation, making it straightforward to allow Nginx access.
+
+sudo ufw app list
+
+It is recommended that you enable the most restrictive profile that will still allow the traffic you’ve configured. Since we haven’t configured SSL for our server yet in this guide, we will only need to allow traffic on port 80.
+
+sudo ufw allow 'Nginx HTTP'
+
+systemctl status nginx  # check with the systemd init system to make sure the service is running by typing
+
+You can access the default Nginx landing page to confirm that the software is running properly by navigating to your server’s IP address. If you do not know your server’s IP address, you can get it a few different ways.
+
+
+ip addr show eth0 | grep inet | awk '{ print $2; }' | sed 's/\/.*$//'
+
+
+# e.g.
+# 138.197.164.16
+# 10.20.0.5
+# fe80::a05c:2dff:fe45:3a16
+
+
+The default configuration that is created when you install nginx in Ubuntu includes one site, called default.
+
+This is the configuration that creates the welcome page. We can start by deleting the symlink to remove this site
+
+sudo rm /etc/nginx/sites-enabled/default
