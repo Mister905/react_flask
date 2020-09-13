@@ -342,4 +342,8 @@ server {
     listen 443 ssl;
     ssl_certificate /home/jamesm/react_flask/api/cert.pm;
     ssl_certificate_key /home/jamesm/react_flask/api/key.pem;
-}  
+}
+
+https://blog.miguelgrinberg.com/post/running-your-flask-application-over-http
+
+^ You need to purchase a domain for thiss  
