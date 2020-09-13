@@ -1,5 +1,22 @@
 PRJECT SETUP
 
+# create parent project folder to hold client and API
+
+mkdir react_flask
+
+cd react_flask
+
+touch .gitignore
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.flaskenv
+
+# Create a new repo from the command line
+
 yarn create react-app client
 
 cd client
@@ -22,6 +39,9 @@ touch .flaskenv
 
 flask run
 
+pip3 freeze > requirements.txt
+
+
 client/package.json
 
 "start-api": "cd ../api && venv/bin/flask run --no-debugger",
@@ -31,7 +51,7 @@ client/package.json
 client/.gitignore
 
 venv
-__pycache__
+
 
 cd client 
 
@@ -53,11 +73,11 @@ adduser jamesm
 
 usermod -aG sudo jamesm
 
-ufw allow OpenSSH
+sudo ufw allow OpenSSH
 
-ufw enable
+sudo ufw enable
 
-ufw status # You can see that SSH connections are still allowed
+sudo ufw status # You can see that SSH connections are still allowed
 
 As the firewall is currently blocking all connections except for SSH, if you install and configure additional services, you will need to adjust the firewall settings to allow acceptable traffic in. You can learn some common UFW operations in this guide.
 
@@ -77,7 +97,7 @@ sudo apt update
 
 sudo apt install nodejs
 
-sudo apt install yarn
+sudo npm install -g yarn
 
 sudo apt install software-properties-common
 
@@ -90,6 +110,22 @@ python3.7 --version
 sudo apt install python3-pip
 
 sudo apt install git
+
+sudo apt install npm
+
+sudo apt-get install python3-venv
+
+
+# CLONE REPO
+
+git clone git@github.com:Mister905/react_flask.git
+
+cd react_flask/client
+
+sudo yarn install   # if you get error follow https://stackoverflow.com/a/52534824
+
+sudo yarn build
+
 
 
 
@@ -124,3 +160,186 @@ The default configuration that is created when you install nginx in Ubuntu inclu
 This is the configuration that creates the welcome page. We can start by deleting the symlink to remove this site
 
 sudo rm /etc/nginx/sites-enabled/default
+
+sudo vim /etc/nginx/sites-available/react_flask.nginx
+
+server {
+    listen 80;
+    root /home/ubuntu/react-flask-app/build;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+        add_header Cache-Control "no-cache";
+    }
+
+    location /static {
+        expires 1y;
+        add_header Cache-Control "public";
+    }
+
+    location /api {
+        include proxy_params;
+        proxy_pass http://localhost:5000;
+    }
+}
+
+
+sudo nginx -c /etc/nginx/nginx.conf -t       # Test your nginx config 
+
+This script has an important simplification. You can see that it is written to listen on port 80, which is the HTTP port used for content that is not encrypted.
+
+https://blog.miguelgrinberg.com/post/running-your-flask-application-over-https
+
+
+The root directive tells nginx the location of the root directory, from where all the static files will be served. This is pointing to the build subdirectory of our project.
+
+The index directive is used to configure the default file that is returned when the client requests a URL that ends with a slash or doesn't have a path at all. The main file of our React project is index.html so that is what we need to use.
+
+
+Enable /etc/nginx/sites-available/react_flask.nginx by creating a symlink to it:
+
+
+sudo ln -s /etc/nginx/sites-available/react_flask.nginx /etc/nginx/sites-enabled/react_flask.nginx
+
+
+sudo systemctl reload nginx
+
+
+try_files $uri /index.html;
+
+
+
+# Serving the Flask Application
+
+cd api 
+
+python3 -m venv venv
+
+source venv/bin/activate
+
+pip install -r requirements.txt
+
+pip install gunicorn
+
+pip list
+
+
+The command to run our API project with Gunicorn is as follows:
+
+gunicorn -b 127.0.0.1:5000 api:app
+
+
+This tells Gunicorn to start the project on port 5000 of the internal network (127.0.0.1). We do not want to run this web server on the public network interface, since all accesses from the outside world are going to come through nginx. The api:app nomenclature is a common notation for WSGI applications, where the first part indicates the module or package where the application is defined, and the second part is the name of the variable in that module that holds it.
+
+
+Unix has several process monitoring systems that are dedicated to the purpose of keeping services running. In most modern Linux distributions, systemd is used for this purpose. If you want to learn the details of how to set up a Flask application under systemd, see this other article. The solution consists in adding a service file in the /etc/systemd/system directory, with all the information that systemd needs to run the Flask application
+
+
+sudo vim /etc/systemd/system/react_flask.service
+
+[Unit]
+Description=A simple Flask API
+After=network.target
+
+[Service]
+User=jamesm
+WorkingDirectory=/home/jamesm/react_flask/api
+ExecStart=/home/jamesm/react_flask/api/venv/bin/gunicorn -b 127.0.0.1:5000 api:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+sudo systemctl daemon-reload
+
+
+sudo systemctl start react_flask
+
+
+sudo systemctl status react_flask
+
+
+
+# Caching Configuration
+
+A detail that is often ignored or glossed over is how to properly configure caching. The files created by React's build tend to be somewhat large, so it is a good idea to have proper caching directives set in place so that clients do not have to download the application every time they connect to the server.
+
+Each file inside of the build/static directory will have a unique hash appended to the filename that is generated based on the contents of the file, which allows you to use aggressive caching techniques to avoid the browser re-downloading your assets if the file contents haven't changed. If the contents of a file changes in a subsequent build, the filename hash that is generated will be different.
+
+
+To deliver the best performance to your users, it's best practice to specify a Cache-Control header for index.html, as well as the files within build/static. This header allows you to control the length of time that the browser as well as CDNs will cache your static assets. 
+
+
+React suggests giving a caching time of one year to all the builds in build/static, and to disable caching for all other files, so let's implement this in the nginx configuration:
+
+
+# How To Set Up a Firewall with UFW on Ubuntu 18.04
+
+UFW is installed by default on Ubuntu. If it has been uninstalled for some reason, you can install it with sudo apt install ufw.
+
+ensure that UFW is configured to support IPv6
+
+sudo vi /etc/default/ufw
+
+IPV6=yes
+
+
+By default, UFW is set to deny all incoming connections and allow all outgoing connections. This means anyone trying to reach your server would not be able to connect, while any application within the server would be able to reach the outside world.
+
+sudo ufw default deny incoming
+
+sudo ufw default allow outgoing
+
+
+HTTPS on port 443, which is what encrypted web servers use:
+
+sudo ufw allow https
+
+
+# Running Your Flask Application Over HTTPS
+
+Any website, especially those that require login credentials, should use HTTPS. In modern web browsers such as Chrome, websites that do not use HTTPS are marked differently than those that are. Look for a green padlock in the URL bar to signify the webpage is secure. Web browsers take HTTPS seriously; Google Chrome and other browsers flag all non-HTTPS websites as not secure.
+
+HTTPS uses an encryption protocol to encrypt communications. The protocol is called Transport Layer Security (TLS), although formerly it was known as Secure Sockets Layer (SSL). This protocol secures communications by using what’s known as an asymmetric public key infrastructure. This type of security system uses two different keys to encrypt communications between two parties:
+
+The private key - this key is controlled by the owner of a website and it’s kept, as the reader may have speculated, private. This key lives on a web server and is used to decrypt information encrypted by the public key.
+The public key - this key is available to everyone who wants to interact with the server in a way that’s secure. Information that’s encrypted by the public key can only be decrypted by the private key.
+
+HTTPS prevents websites from having their information broadcast in a way that’s easily viewed by anyone snooping on the network. When information is sent over regular HTTP, the information is broken into packets of data that can be easily “sniffed” using free software. This makes communication over the an unsecure medium, such as public Wi-Fi, highly vulnerable to interception. In fact, all communications that occur over HTTP occur in plain text, making them highly accessible to anyone with the correct tools, and vulnerable to on-path attacks.
+
+With HTTPS, traffic is encrypted such that even if the packets are sniffed or otherwise intercepted, they will come across as nonsensical characters.
+
+The general idea is that when the client establishes a connection with the server and requests an encrypted connection, the server responds with its SSL Certificate. The certificate acts as identification for the server, as it includes the server name and domain. To ensure that the information provided by the server is correct, the certificate is cryptographically signed by a certificate authority, or CA. If the client knows and trusts the CA, it can confirm that the certificate signature indeed comes from this entity, and with this the client can be certain that the server it connected to is legitimate.
+
+After the client verifies the certificate, it creates an encryption key to use for the communication with the server. To make sure that this key is sent securely to the server, it encrypts it using a public key that is included with the server certificate. The server is in possession of the private key that goes with that public key in the certificate, so it is the only party that is able to decrypt the package. From the point when the server receives the encryption key all traffic is encrypted with this key that only the client and server know.
+
+
+
+Using Production Web Servers
+Of course we all know that the Flask development server is only good for development and testing. So how do we install an SSL certificate on a production server?
+
+cd ~/react_flask/api
+
+
+openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
+
+This command writes a new certificate in cert.pem with its corresponding private key in key.pem, with a validity period of 365 days. When you run this command, you will be asked a few questions
+
+gunicorn --certfile cert.pem --keyfile key.pem -b 0.0.0.0:8000 api:app
+
+If you use nginx as a reverse proxy, then you can configure the certificate with nginx, and then nginx can "terminate" the encrypted connection, meaning that it will accept encrypted connections from the outside, but then use regular unencrypted connections to talk to your Flask backend. This is a very useful set up, as it frees your application from having to deal with certificates and encryption.
+
+
+sudo vim /etc/systemd/system/react_flask.service
+
+
+sudo vim /etc/nginx/sites-available/react_flask.nginx
+
+server {
+    listen 443 ssl;
+    ssl_certificate /home/jamesm/react_flask/api/cert.pm;
+    ssl_certificate_key /home/jamesm/react_flask/api/key.pem;
+}  
